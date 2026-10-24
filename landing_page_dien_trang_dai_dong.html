@@ -750,14 +750,84 @@
     @media (max-width: 1024px) {
       .roadmap-seamless-area {
         order: 1;
-        height: clamp(300px, 46dvh, 390px);
-        border: 1.5px solid rgba(223, 191, 114, 0.35);
+        height: clamp(385px, 50dvh, 450px);
+        border: 1.5px solid rgba(223, 191, 114, 0.42);
         touch-action: none;
-        scroll-margin-top: 14px;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        scroll-margin-top: 10px;
       }
     }
 
-    /* The 1600x760 Coordinate Stage — Hardware-Accelerated GPU Texture Layer */
+    /* Floating Zoom & Overview Controls inside Roadmap Viewport */
+    .roadmap-zoom-controls {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      z-index: 25;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: rgba(34, 4, 7, 0.88);
+      border: 1.5px solid rgba(243, 215, 138, 0.55);
+      border-radius: 999px;
+      padding: 4px 5px;
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+    }
+
+    .rz-btn {
+      background: rgba(255, 248, 235, 0.08);
+      border: 1px solid rgba(223, 191, 114, 0.35);
+      color: var(--gold-bright);
+      height: 28px;
+      min-width: 28px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 900;
+      line-height: 1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease, color 0.2s ease, transform 0.15s ease;
+    }
+    .rz-btn:hover, .rz-btn:active {
+      background: var(--gold-bright);
+      color: #2B0507;
+    }
+    .rz-btn.rz-fit {
+      font-size: 11px;
+      font-weight: 800;
+      padding: 0 10px;
+      letter-spacing: 0.02em;
+    }
+
+    .roadmap-mobile-hint {
+      display: none;
+    }
+    @media (max-width: 1024px) {
+      .roadmap-mobile-hint {
+        order: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        margin-bottom: -6px;
+        color: var(--gold-bright);
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.01em;
+        opacity: 0.92;
+      }
+      .rz-btn {
+        height: 30px;
+        min-width: 30px;
+      }
+    }
+
+    /* The 1600x760 Coordinate Stage — Crisp Retina Re-Rasterization + 120fps Motion */
     .roadmap-stage {
       width: 1600px;
       height: 760px;
@@ -765,11 +835,11 @@
       top: 0;
       left: 0;
       transform-origin: 0 0;
-      /* Snappy, zero-lag camera zoom & pan on GPU compositor */
-      transition: transform 0.52s cubic-bezier(0.22, 1, 0.36, 1);
+      transition: transform 0.44s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+
+    .roadmap-stage.is-moving {
       will-change: transform;
-      backface-visibility: hidden;
-      -webkit-backface-visibility: hidden;
     }
 
     .roadmap-stage.no-transition {
@@ -797,22 +867,18 @@
       border-left-width: 6px;
       z-index: 6;
       cursor: pointer;
-      backface-visibility: hidden;
       transition:
-        transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
         border-color 0.25s ease,
         opacity 0.28s ease;
     }
 
     .node-card:hover {
-      transform: translate3d(0, -3px, 0) scale(1.015);
       border-color: var(--gold-bright);
     }
 
     .node-card.selected-node {
       border-color: var(--gold-bright);
       box-shadow: 0 0 0 3px #F3D78A, 0 14px 30px rgba(0, 0, 0, 0.72);
-      transform: translate3d(0, -2px, 0) scale(1.015);
       z-index: 12;
       opacity: 1 !important;
     }
@@ -1189,8 +1255,18 @@
         </div>
       </aside>
 
+      <!-- Mobile Gesture Caption Above Roadmap -->
+      <div class="roadmap-mobile-hint" aria-hidden="true">
+        <span>👆 Chạm chọn mốc trên bản đồ • Kéo 1 ngón / Chụm 2 ngón để Zoom</span>
+      </div>
+
       <!-- RIGHT 2/3: SEAMLESS TIMELINE ON BACKGROUND (NO BOX, NO TOOLBAR) -->
       <div class="roadmap-seamless-area" id="roadmap-viewport">
+        <div class="roadmap-zoom-controls" id="roadmap-zoom-controls">
+          <button type="button" class="rz-btn" onclick="stepZoom(-1)" title="Thu nhỏ">−</button>
+          <button type="button" class="rz-btn rz-fit" id="rz-overview-btn" onclick="toggleOverviewZoom()">Toàn cảnh</button>
+          <button type="button" class="rz-btn" onclick="stepZoom(1)" title="Phóng to">+</button>
+        </div>
         <div class="roadmap-stage focused-mode" id="roadmap-stage">
 
           <!-- SVG SINUSOIDAL WAVE, 5 CHEVRONS, CONNECTED FEEDBACK LOOPS & MILESTONE PINS -->
@@ -1251,35 +1327,35 @@
             <circle cx="802" cy="292" r="5" fill="#FFA94D" stroke="#FFFFFF" stroke-width="2"/>
 
             <!-- 5 INTERLOCKING HORIZONTAL CHEVRON BARS (Y = 382 to 438) -->
-            <g style="cursor:pointer;" onclick="handleMilestoneClick('1A')">
+            <g style="cursor:pointer;" data-ms="1A">
               <polygon points="48,388 330,388 356,416 330,444 48,444" fill="rgba(0,0,0,0.42)"/>
               <polygon points="48,382 330,382 356,410 330,438 48,438" fill="url(#chev1A)" stroke="rgba(255,240,200,0.35)" stroke-width="1.2"/>
               <text x="192" y="405" fill="#FFE8B3" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.06em">PHASE 1A · KHỞI ĐỘNG HỆ THỐNG</text>
               <text x="192" y="424" fill="#FFFFFF" font-size="13.5" font-weight="900" text-anchor="middle">AGRI HUB &amp; BAO TIÊU XANH</text>
             </g>
 
-            <g style="cursor:pointer;" onclick="handleMilestoneClick('1B')">
+            <g style="cursor:pointer;" data-ms="1B">
               <polygon points="342,388 634,388 660,416 634,444 342,444 368,416" fill="rgba(0,0,0,0.42)"/>
               <polygon points="342,382 634,382 660,410 634,438 342,438 368,410" fill="url(#chev1B)" stroke="rgba(255,240,200,0.35)" stroke-width="1.2"/>
               <text x="498" y="405" fill="#FFE8B3" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.06em">PHASE 1B · XÂY DỰNG DANH TIẾNG</text>
               <text x="498" y="424" fill="#FFFFFF" font-size="13.5" font-weight="900" text-anchor="middle">FRESHTRANSIT &amp; GREEN ID</text>
             </g>
 
-            <g style="cursor:pointer;" onclick="handleMilestoneClick('2A')">
+            <g style="cursor:pointer;" data-ms="2A">
               <polygon points="646,388 938,388 964,416 938,444 646,444 672,416" fill="rgba(0,0,0,0.42)"/>
               <polygon points="646,382 938,382 964,410 938,438 646,438 672,410" fill="url(#chev2A)" stroke="rgba(255,240,200,0.35)" stroke-width="1.2"/>
               <text x="802" y="405" fill="#FFF8EB" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.06em">PHASE 2A · THU HÚT ĐẦU TƯ</text>
               <text x="802" y="424" fill="#FFFFFF" font-size="13.5" font-weight="900" text-anchor="middle">CROWDFARMING &amp; QUÀ B2B</text>
             </g>
 
-            <g style="cursor:pointer;" onclick="handleMilestoneClick('2B')">
+            <g style="cursor:pointer;" data-ms="2B">
               <polygon points="950,388 1242,388 1268,416 1242,444 950,444 976,416" fill="rgba(0,0,0,0.42)"/>
               <polygon points="950,382 1242,382 1268,410 1242,438 950,438 976,410" fill="url(#chev2B)" stroke="rgba(255,240,200,0.35)" stroke-width="1.2"/>
               <text x="1106" y="405" fill="#D0F0FF" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.06em">PHASE 2B · CẢI TẠO &amp; LÀNG NGHỀ</text>
               <text x="1106" y="424" fill="#FFFFFF" font-size="13.5" font-weight="900" text-anchor="middle">BIOFLOW, ECO HUB &amp; NỐI NGHỀ</text>
             </g>
 
-            <g style="cursor:pointer;" onclick="handleMilestoneClick('3')">
+            <g style="cursor:pointer;" data-ms="3">
               <polygon points="1254,388 1538,388 1564,416 1538,444 1254,444 1280,416" fill="rgba(0,0,0,0.42)"/>
               <polygon points="1254,382 1538,382 1564,410 1538,438 1254,438 1280,410" fill="url(#chev3)" stroke="rgba(255,240,200,0.35)" stroke-width="1.2"/>
               <text x="1406" y="405" fill="#EEFFCC" font-size="11" font-weight="700" text-anchor="middle" letter-spacing="0.06em">PHASE 3 · BÙNG NỔ LỢI NHUẬN</text>
@@ -1287,37 +1363,37 @@
             </g>
 
             <!-- MILESTONE CIRCLES ON WAVE PEAKS & TROUGHS (Pure Vector Shadow, Zero SVG Filter Lag) -->
-            <g class="svg-milestone-group" onclick="handleMilestoneClick('1A')">
+            <g class="svg-milestone-group" data-ms="1A">
               <circle cx="184" cy="493" r="22" fill="rgba(0,0,0,0.45)"/>
               <circle cx="184" cy="488" r="21" fill="#9E1B20" stroke="#F3D78A" stroke-width="4"/>
               <text x="184" y="493" fill="#FFE8B3" font-size="13.5" font-weight="900" text-anchor="middle">1A</text>
             </g>
 
-            <g class="svg-milestone-group" onclick="handleMilestoneClick('1B')">
+            <g class="svg-milestone-group" data-ms="1B">
               <circle cx="490" cy="321" r="22" fill="rgba(0,0,0,0.45)"/>
               <circle cx="490" cy="316" r="21" fill="#C2410C" stroke="#F3D78A" stroke-width="4"/>
               <text x="490" y="321" fill="#FFFFFF" font-size="13.5" font-weight="900" text-anchor="middle">1B</text>
             </g>
 
-            <g class="svg-milestone-group" onclick="handleMilestoneClick('2A')">
+            <g class="svg-milestone-group" data-ms="2A">
               <circle cx="794" cy="493" r="22" fill="rgba(0,0,0,0.45)"/>
               <circle cx="794" cy="488" r="21" fill="#B87D14" stroke="#F3D78A" stroke-width="4"/>
               <text x="794" y="493" fill="#FFFFFF" font-size="13.5" font-weight="900" text-anchor="middle">2A</text>
             </g>
 
-            <g class="svg-milestone-group" onclick="handleMilestoneClick('2B')">
+            <g class="svg-milestone-group" data-ms="2B">
               <circle cx="1098" cy="321" r="22" fill="rgba(0,0,0,0.45)"/>
               <circle cx="1098" cy="316" r="21" fill="#0E6BA8" stroke="#F3D78A" stroke-width="4"/>
               <text x="1098" y="321" fill="#FFFFFF" font-size="13.5" font-weight="900" text-anchor="middle">2B</text>
             </g>
 
-            <g class="svg-milestone-group" onclick="handleMilestoneClick('3')">
+            <g class="svg-milestone-group" data-ms="3">
               <circle cx="1385" cy="493" r="22" fill="rgba(0,0,0,0.45)"/>
               <circle cx="1385" cy="488" r="21" fill="#4D8B1A" stroke="#F3D78A" stroke-width="4"/>
               <text x="1385" y="493" fill="#FFFFFF" font-size="14" font-weight="900" text-anchor="middle">3</text>
             </g>
 
-            <g class="svg-milestone-group" onclick="handleMilestoneClick('3')">
+            <g class="svg-milestone-group" data-ms="3">
               <circle cx="1552" cy="352" r="17" fill="rgba(0,0,0,0.45)"/>
               <circle cx="1552" cy="348" r="16" fill="#4D8B1A" stroke="#F3D78A" stroke-width="3.2"/>
               <text x="1552" y="354" fill="#FFE8B3" font-size="13" font-weight="900" text-anchor="middle">★</text>
@@ -1340,7 +1416,7 @@
           </svg>
 
           <!-- ================= HTML CALLOUT CARDS ON THE 1600x760 STAGE ================= -->
-          <div class="node-card crimson selected-node" data-ms="1A" onclick="handleMilestoneClick('1A')" style="left: 42px; top: 188px; width: 302px;">
+          <div class="node-card crimson selected-node" data-ms="1A" style="left: 42px; top: 188px; width: 302px;">
             <div class="nc-head">
               <span>1A. AGRI HUB &amp; BAO TIÊU XANH</span>
               <span class="nc-tag">THÁNG 1–3</span>
@@ -1356,7 +1432,7 @@
             </div>
           </div>
 
-          <div class="node-card crimson selected-node" data-ms="1A" onclick="handleMilestoneClick('1A')" style="left: 42px; top: 514px; width: 302px;">
+          <div class="node-card crimson selected-node" data-ms="1A" style="left: 42px; top: 514px; width: 302px;">
             <div class="nc-head">
               <span>XÂY DỰNG DANH TIẾNG XÃ BÌNH MỸ</span>
               <span class="nc-tag">VỐN 40TR</span>
@@ -1368,7 +1444,7 @@
           </div>
 
           <!-- CARD 1B -->
-          <div class="node-card amber" data-ms="1B" onclick="handleMilestoneClick('1B')" style="left: 352px; top: 128px; width: 302px;">
+          <div class="node-card amber" data-ms="1B" style="left: 352px; top: 128px; width: 302px;">
             <div class="nc-head">
               <span>1B. FRESHTRANSIT &amp; GREEN ID</span>
               <span class="nc-tag">MINH BẠCH 100%</span>
@@ -1383,13 +1459,13 @@
             </div>
           </div>
 
-          <div class="phase-goal-box" onclick="handleMilestoneClick('1B')" style="left: 358px; top: 448px; width: 284px;">
+          <div class="phase-goal-box" data-ms="1B" style="left: 358px; top: 448px; width: 284px;">
             <strong>Bàn đạp lên Phase 2:</strong><br/>
             Khi khách phố đã ăn thử rau quả Bình Mỹ &amp; tin tưởng tem <strong>GreenID</strong> ở Phase 1, xã mới đủ <strong>danh tiếng</strong> để mở <strong>Crowdfarming</strong> ở Phase 2!
           </div>
 
           <!-- CARD 2A -->
-          <div class="node-card gold" data-ms="2A" onclick="handleMilestoneClick('2A')" style="left: 642px; top: 514px; width: 325px;">
+          <div class="node-card gold" data-ms="2A" style="left: 642px; top: 514px; width: 325px;">
             <div class="nc-head">
               <span>2A. CROWDFARMING &amp; QUÀ B2B</span>
               <span class="nc-tag">THÁNG 4–8</span>
@@ -1404,13 +1480,13 @@
             </div>
           </div>
 
-          <div class="phase-goal-box" onclick="handleMilestoneClick('2A')" style="left: 660px; top: 292px; width: 284px;">
+          <div class="phase-goal-box" data-ms="2A" style="left: 660px; top: 292px; width: 284px;">
             <strong>Tại sao Crowdfarming ở Phase 2?</strong><br/>
             Nhận nuôi cây cần <strong>niềm tin rất lớn</strong>. Đặt ở Phase 2 giúp tỷ lệ chuyển đổi cao gấp bội nhờ uy tín tích lũy từ Phase 1!
           </div>
 
           <!-- CARD 2B -->
-          <div class="node-card teal" data-ms="2B" onclick="handleMilestoneClick('2B')" style="left: 956px; top: 128px; width: 318px;">
+          <div class="node-card teal" data-ms="2B" style="left: 956px; top: 128px; width: 318px;">
             <div class="nc-head">
               <span>2B. BIOFLOW, ECO HUB &amp; NỐI NGHỀ</span>
               <span class="nc-tag">6–12 THÁNG</span>
@@ -1426,7 +1502,7 @@
           </div>
 
           <!-- CARD 3 -->
-          <div class="node-card green" data-ms="3" onclick="handleMilestoneClick('3')" style="left: 1272px; top: 188px; width: 292px;">
+          <div class="node-card green" data-ms="3" style="left: 1272px; top: 188px; width: 292px;">
             <div class="nc-head">
               <span>3. KDL ĐIỀN TRANG ĐẠI ĐỒNG</span>
               <span class="nc-tag">HÁI QUẢ NGỌT</span>
@@ -1442,7 +1518,7 @@
             </div>
           </div>
 
-          <div class="node-card green" data-ms="3" onclick="handleMilestoneClick('3')" style="left: 1255px; top: 514px; width: 315px;">
+          <div class="node-card green" data-ms="3" style="left: 1255px; top: 514px; width: 315px;">
             <div class="nc-head">
               <span>VÒNG LẶP GIỮ CHÂN KHÁCH HÀNG</span>
               <span class="nc-tag">FLYWHEEL</span>
@@ -1499,6 +1575,7 @@
         title: '1A. Xây Dựng Hệ Thống Hỗ Trợ Nông Dân & Tạo Thói Quen Tiêu Dùng',
         summary: 'Giải quyết trực tiếp nỗi đau nông dân Bình Mỹ bị thương lái ép giá bằng bộ đôi ứng dụng Agri Hub (Tối ưu đầu vào) và Bao Tiêu Xanh (Tối đa đầu ra) dưới sự bảo chứng của HTX Nông nghiệp Bình Mỹ.',
         camera: { x: 350, y: 408, scale: 2.04 },
+        mobileCamera: { x: 232, y: 416 },
         projects: [
           {
             name: '1. App Agri Hub (Dành cho Nông dân)',
@@ -1537,6 +1614,7 @@
         title: '1B. Trạm Trung Chuyển Hẻm Nhỏ FreshTransit & Định Danh GreenID',
         summary: 'Hoàn thiện mắt xích vận chuyển chống dập nát từ các con hẻm nhỏ dưới 2m tại xã Bình Mỹ lên TP.HCM và minh bạch hóa 100% nguồn gốc nông sản bằng công nghệ NFC Zero-App.',
         camera: { x: 640, y: 334, scale: 2.04 },
+        mobileCamera: { x: 538, y: 342 },
         projects: [
           {
             name: '1. Bình Mỹ FreshTransit (Logistics Hẻm Nhỏ)',
@@ -1566,6 +1644,7 @@
         title: '2A. Bung Mô Hình Nhận Nuôi Cây Crowdfarming & Giỏ Quà B2B',
         summary: 'Khi nông sản xã Bình Mỹ đã có danh tiếng vững chắc từ Phase 1, dự án chính thức mở gói Nhận nuôi cây ăn trái rễ sâu chống sạt lở (GreenBinhMy + NFC GreenID) và cung cấp giỏ quà hữu cơ B2B dịp Lễ/Tết.',
         camera: { x: 945, y: 492, scale: 2.04 },
+        mobileCamera: { x: 842, y: 495 },
         projects: [
           {
             name: '1. Crowdfarming Nhận Nuôi Cây (GreenBinhMy × GreenID)',
@@ -1604,6 +1683,7 @@
         title: '2B. Máy Vớt Bèo BioFlow, Trạm Phân Bón Eco Hub & Làng Nghề Nối Nghề',
         summary: 'Xây dựng các dự án vệ tinh cải tạo cảnh quan kênh rạch, tự chủ nguồn phân bón hữu cơ giá rẻ và đào tạo người dân địa phương sẵn sàng đón khách du lịch sinh thái.',
         camera: { x: 1240, y: 318, scale: 2.04 },
+        mobileCamera: { x: 1146, y: 294 },
         projects: [
           {
             name: '1. Hệ Thống Vớt Bèo Rác Tự Động BioFlow',
@@ -1642,6 +1722,7 @@
         title: '3. Khu Du Lịch Sinh Thái Ven Sông Điền Trang Đại Đồng (F&B & Lưu Trú)',
         summary: 'Giai đoạn kiếm được nhiều tiền nhất mà bỏ ra ít vốn nhất: Đón dòng khách từ vé tặng 2N1Đ của Crowdfarming và du khách TP.HCM về trải nghiệm ẩm thực F&B ven sông, Workshop nông nghiệp tuần hoàn và làng nghề.',
         camera: { x: 1265, y: 408, scale: 2.04 },
+        mobileCamera: { x: 1388, y: 408 },
         projects: [
           {
             name: '1. Tổ Hợp Ẩm Thực Ven Sông (F&B) & Lưu Trú Sinh Thái 2N1Đ',
@@ -1724,6 +1805,9 @@
     let userZoom = 2.04;
     let panX = 0;
     let panY = 0;
+    let sharpenTimer = null;
+    const activePointers = new Map();
+    const rzOverviewBtn = document.getElementById('rz-overview-btn');
 
     function updateCachedMetrics() {
       cachedVw = viewport.clientWidth || 980;
@@ -1732,10 +1816,72 @@
       baseScale = Math.min(cachedVw / 1600, cachedVh / 760);
     }
 
+    function getMobileFocusZoom() {
+      // Frames ~428 stage px horizontally (1 full phase + ~30% of next phase) with crisp readable text
+      const targetTotalScale = Math.min(cachedVw / 428, cachedVh / 462);
+      return Math.max(1.8, targetTotalScale / baseScale);
+    }
+
+    function updateOverviewBtnLabel() {
+      if (rzOverviewBtn) {
+        rzOverviewBtn.textContent = isOverviewMode ? 'Cận cảnh' : 'Toàn cảnh';
+      }
+    }
+
+    function clampPan(totalScale) {
+      const stageW = 1600 * totalScale;
+      const stageH = 760 * totalScale;
+      const padX = Math.min(80, cachedVw * 0.22);
+      const padY = Math.min(64, cachedVh * 0.18);
+
+      if (stageW + padX * 2 <= cachedVw) {
+        panX = (cachedVw - stageW) / 2;
+      } else {
+        const minX = cachedVw - stageW - padX;
+        const maxX = padX;
+        panX = Math.max(minX, Math.min(maxX, panX));
+      }
+
+      if (stageH + padY * 2 <= cachedVh) {
+        panY = (cachedVh - stageH) / 2;
+      } else {
+        const minY = cachedVh - stageH - padY;
+        const maxY = padY;
+        panY = Math.max(minY, Math.min(maxY, panY));
+      }
+    }
+
+    function scheduleSharpen(delayMs = 460) {
+      if (sharpenTimer) clearTimeout(sharpenTimer);
+      sharpenTimer = setTimeout(() => {
+        const totalScale = baseScale * userZoom;
+        stage.classList.add('no-transition');
+        stage.classList.remove('is-moving');
+        // 2D translate + scale triggers crisp Retina glyph re-rasterization on iOS Safari / Chrome
+        stage.style.transform = `translate(${panX.toFixed(1)}px, ${panY.toFixed(1)}px) scale(${totalScale.toFixed(4)})`;
+      }, delayMs);
+    }
+
     function applyTransform(smooth = true) {
-      stage.classList.toggle('no-transition', !smooth);
+      if (sharpenTimer) clearTimeout(sharpenTimer);
       const totalScale = baseScale * userZoom;
-      stage.style.transform = `translate3d(${panX.toFixed(1)}px, ${panY.toFixed(1)}px, 0) scale(${totalScale.toFixed(4)})`;
+      if (smooth) {
+        stage.classList.add('is-moving');
+        stage.classList.remove('no-transition');
+        // Ensure browser acknowledges transition state if previously no-transition
+        void stage.offsetWidth;
+        stage.style.transform = `translate3d(${panX.toFixed(1)}px, ${panY.toFixed(1)}px, 0) scale(${totalScale.toFixed(4)})`;
+        scheduleSharpen(460);
+      } else {
+        stage.classList.add('no-transition');
+        if (activePointers.size > 0) {
+          stage.classList.add('is-moving');
+          stage.style.transform = `translate3d(${panX.toFixed(1)}px, ${panY.toFixed(1)}px, 0) scale(${totalScale.toFixed(4)})`;
+        } else {
+          stage.classList.remove('is-moving');
+          stage.style.transform = `translate(${panX.toFixed(1)}px, ${panY.toFixed(1)}px) scale(${totalScale.toFixed(4)})`;
+        }
+      }
     }
 
     function showOverviewMode(smooth = true) {
@@ -1744,7 +1890,37 @@
       userZoom = 1;
       panX = (cachedVw - 1600 * baseScale) / 2;
       panY = (cachedVh - 760 * baseScale) / 2;
+      updateOverviewBtnLabel();
       applyTransform(smooth);
+    }
+
+    function toggleOverviewZoom() {
+      if (isOverviewMode) {
+        selectMilestone(currentMilestone, currentSubpart, true);
+      } else {
+        showOverviewMode(true);
+      }
+    }
+
+    function stepZoom(dir) {
+      const prevTotal = baseScale * userZoom;
+      const factor = dir > 0 ? 1.32 : (1 / 1.32);
+      const minTotal = baseScale * 0.96;
+      const maxTotal = isMobileViewport ? 2.15 : 2.6;
+      const nextTotal = Math.max(minTotal, Math.min(maxTotal, prevTotal * factor));
+
+      const centerStageX = (cachedVw / 2 - panX) / prevTotal;
+      const centerStageY = (cachedVh / 2 - panY) / prevTotal;
+
+      userZoom = nextTotal / baseScale;
+      isOverviewMode = (userZoom <= 1.08);
+      stage.classList.toggle('focused-mode', !isOverviewMode);
+      updateOverviewBtnLabel();
+
+      panX = cachedVw / 2 - centerStageX * nextTotal;
+      panY = cachedVh / 2 - centerStageY * nextTotal;
+      clampPan(nextTotal);
+      applyTransform(true);
     }
 
     function focusCameraOn(stageX, stageY, targetZoom = 2.04, smooth = true) {
@@ -1755,12 +1931,8 @@
 
       panX = (cachedVw / 2) - (stageX * totalScale);
       panY = (cachedVh / 2) - (stageY * totalScale);
-
-      const minX = cachedVw - 1600 * totalScale - 16;
-      const minY = cachedVh - 760 * totalScale - 12;
-      panX = Math.max(minX, Math.min(16, panX));
-      panY = Math.max(minY, Math.min(12, panY));
-
+      clampPan(totalScale);
+      updateOverviewBtnLabel();
       applyTransform(smooth);
     }
 
@@ -1821,8 +1993,12 @@
       const data = MILESTONE_DATA[msId];
       if (!data) return;
 
-      // 1. Trigger GPU Camera Transform FIRST before any DOM text updates
-      focusCameraOn(data.camera.x, data.camera.y, isMobileViewport ? 1.55 : data.camera.scale, smooth);
+      // 1. Trigger GPU Camera Transform FIRST (PC vs Mobile tailored framing & readable scale)
+      if (isMobileViewport && data.mobileCamera) {
+        focusCameraOn(data.mobileCamera.x, data.mobileCamera.y, getMobileFocusZoom(), smooth);
+      } else {
+        focusCameraOn(data.camera.x, data.camera.y, data.camera.scale, smooth);
+      }
 
       // 2. Highlight Callout Cards on Roadmap using cached array
       for (let i = 0; i < nodeCards.length; i++) {
@@ -1830,7 +2006,7 @@
         card.classList.toggle('selected-node', card.dataset.ms === msId);
       }
 
-      // 3. Update Stepper Dots & Left Panel
+      // 3. Update Stepper Dots & Panel
       for (let i = 0; i < ORDER.length; i++) {
         const id = ORDER[i];
         const active = id === msId;
@@ -1845,14 +2021,16 @@
       renderSubpartContent();
     }
 
-    // Handle clicking a milestone on the Roadmap (PC vs Mobile behavior)
+    // Handle clicking/tapping a milestone on the Roadmap (PC-like smooth zoom on Mobile too!)
     const sideInfoPanelEl = document.getElementById('side-info-panel');
     function handleMilestoneClick(msId) {
       selectMilestone(msId, 0, true);
-      if (isMobileViewport && sideInfoPanelEl) {
-        setTimeout(() => {
-          sideInfoPanelEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 120);
+      // On Mobile: Keep the Roadmap in view so user watches the zoom AND sees the info box right below it!
+      if (isMobileViewport && sideInfoPanelEl && viewport) {
+        const panelRect = sideInfoPanelEl.getBoundingClientRect();
+        if (panelRect.top > window.innerHeight * 0.68) {
+          viewport.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }
     }
 
@@ -1870,9 +2048,33 @@
       });
     }
 
-    // Mouse Wheel Scrollytelling on Desktop (Snappy 250ms response, zero layout thrash)
+    // Desktop Wheel: Trackpad Pinch-Zoom (ctrlKey) OR Scrollytelling Step
     let lastWheelTime = 0;
     window.addEventListener('wheel', (e) => {
+      if (e.ctrlKey && viewport.contains(e.target)) {
+        e.preventDefault();
+        const rect = viewport.getBoundingClientRect();
+        const mx = e.clientX - rect.left;
+        const my = e.clientY - rect.top;
+        const prevTotal = baseScale * userZoom;
+        const factor = Math.exp(-e.deltaY * 0.0045);
+        const minTotal = baseScale * 0.96;
+        const maxTotal = 2.6;
+        const nextTotal = Math.max(minTotal, Math.min(maxTotal, prevTotal * factor));
+        const sx = (mx - panX) / prevTotal;
+        const sy = (my - panY) / prevTotal;
+        userZoom = nextTotal / baseScale;
+        isOverviewMode = (userZoom <= 1.08);
+        stage.classList.toggle('focused-mode', !isOverviewMode);
+        updateOverviewBtnLabel();
+        panX = mx - sx * nextTotal;
+        panY = my - sy * nextTotal;
+        clampPan(nextTotal);
+        applyTransform(false);
+        scheduleSharpen(180);
+        return;
+      }
+
       if (isMobileViewport) return;
       if (subpartStageEl && subpartStageEl.contains(e.target) && subpartStageEl.scrollHeight > subpartStageEl.clientHeight + 2) {
         const atBottom = subpartStageEl.scrollTop + subpartStageEl.clientHeight >= subpartStageEl.scrollHeight - 2;
@@ -1924,49 +2126,161 @@
       }
     }, { passive: true });
 
-    // Drag-to-Pan on Roadmap Viewport (rAF-synchronized for 120fps dragging)
+    // Prevent iOS Safari native page-pinch inside the Roadmap so 2-finger pinch zooms ONLY the Roadmap
+    viewport.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
+    viewport.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
+
+    // Unified 120fps Multi-Touch Engine: Instant Tap + 1-Finger Drag Anywhere + 2-Finger Pinch-to-Zoom
     let isDragging = false;
     let dragRafPending = false;
-    let startX = 0;
-    let startY = 0;
-    let startPanX = 0;
-    let startPanY = 0;
+    let dragLastX = 0;
+    let dragLastY = 0;
+    let cachedVpLeft = 0;
+    let cachedVpTop = 0;
+    let pinchPrevDist = 0;
+    let pinchPrevMidX = 0;
+    let pinchPrevMidY = 0;
+    let tapCandidate = null;
+
+    function initPinchMetrics() {
+      const pts = Array.from(activePointers.values());
+      if (pts.length < 2) return;
+      pinchPrevDist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+      pinchPrevMidX = (pts[0].x + pts[1].x) / 2 - cachedVpLeft;
+      pinchPrevMidY = (pts[0].y + pts[1].y) / 2 - cachedVpTop;
+    }
 
     viewport.addEventListener('pointerdown', (e) => {
-      if (e.target.closest('.node-card') || e.target.closest('.phase-goal-box') || e.target.closest('.svg-milestone-group')) {
-        return;
+      if (e.target.closest('.roadmap-zoom-controls')) return;
+
+      const rect = viewport.getBoundingClientRect();
+      cachedVpLeft = rect.left;
+      cachedVpTop = rect.top;
+
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      try { viewport.setPointerCapture(e.pointerId); } catch (_) {}
+
+      if (activePointers.size === 1) {
+        tapCandidate = {
+          id: e.pointerId,
+          startX: e.clientX,
+          startY: e.clientY,
+          target: e.target,
+          moved: false
+        };
+        dragLastX = e.clientX;
+        dragLastY = e.clientY;
+      } else if (activePointers.size === 2) {
+        tapCandidate = null;
+        isDragging = false;
+        stage.classList.add('is-moving', 'no-transition');
+        initPinchMetrics();
       }
-      isDragging = true;
-      viewport.classList.add('dragging');
-      stage.classList.add('no-transition');
-      startX = e.clientX;
-      startY = e.clientY;
-      startPanX = panX;
-      startPanY = panY;
-      viewport.setPointerCapture(e.pointerId);
     });
 
     viewport.addEventListener('pointermove', (e) => {
-      if (!isDragging) return;
-      panX = startPanX + (e.clientX - startX);
-      panY = startPanY + (e.clientY - startY);
-      if (!dragRafPending) {
-        dragRafPending = true;
-        requestAnimationFrame(() => {
-          applyTransform(false);
-          dragRafPending = false;
-        });
+      if (!activePointers.has(e.pointerId)) return;
+      activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+      if (activePointers.size >= 2) {
+        const pts = Array.from(activePointers.values());
+        const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y);
+        const midX = (pts[0].x + pts[1].x) / 2 - cachedVpLeft;
+        const midY = (pts[0].y + pts[1].y) / 2 - cachedVpTop;
+
+        const prevTotal = baseScale * userZoom;
+        const stageX = (pinchPrevMidX - panX) / prevTotal;
+        const stageY = (pinchPrevMidY - panY) / prevTotal;
+
+        const ratio = pinchPrevDist > 8 ? (dist / pinchPrevDist) : 1;
+        const minTotal = baseScale * 0.94;
+        const maxTotal = isMobileViewport ? 2.15 : 2.6;
+        const nextTotal = Math.max(minTotal, Math.min(maxTotal, prevTotal * ratio));
+
+        userZoom = nextTotal / baseScale;
+        isOverviewMode = (userZoom <= 1.08);
+        stage.classList.toggle('focused-mode', !isOverviewMode);
+        updateOverviewBtnLabel();
+
+        panX = midX - stageX * nextTotal;
+        panY = midY - stageY * nextTotal;
+        clampPan(nextTotal);
+
+        pinchPrevDist = dist;
+        pinchPrevMidX = midX;
+        pinchPrevMidY = midY;
+
+        if (!dragRafPending) {
+          dragRafPending = true;
+          requestAnimationFrame(() => {
+            applyTransform(false);
+            dragRafPending = false;
+          });
+        }
+        return;
+      }
+
+      if (activePointers.size === 1) {
+        if (tapCandidate && tapCandidate.id === e.pointerId && !tapCandidate.moved) {
+          const movedDist = Math.hypot(e.clientX - tapCandidate.startX, e.clientY - tapCandidate.startY);
+          if (movedDist > 8) {
+            tapCandidate.moved = true;
+            isDragging = true;
+            viewport.classList.add('dragging');
+            stage.classList.add('is-moving', 'no-transition');
+            dragLastX = e.clientX;
+            dragLastY = e.clientY;
+          }
+        }
+
+        if (isDragging) {
+          panX += (e.clientX - dragLastX);
+          panY += (e.clientY - dragLastY);
+          dragLastX = e.clientX;
+          dragLastY = e.clientY;
+          clampPan(baseScale * userZoom);
+
+          if (!dragRafPending) {
+            dragRafPending = true;
+            requestAnimationFrame(() => {
+              applyTransform(false);
+              dragRafPending = false;
+            });
+          }
+        }
       }
     });
 
-    const endDrag = () => {
-      if (isDragging) {
+    function onPointerFinish(e) {
+      if (e.type === 'pointerup' && tapCandidate && tapCandidate.id === e.pointerId && !tapCandidate.moved) {
+        const msEl = tapCandidate.target && tapCandidate.target.closest ? tapCandidate.target.closest('[data-ms]') : null;
+        activePointers.delete(e.pointerId);
+        tapCandidate = null;
         isDragging = false;
         viewport.classList.remove('dragging');
+        if (msEl && msEl.dataset.ms) {
+          handleMilestoneClick(msEl.dataset.ms);
+          return;
+        }
       }
-    };
-    viewport.addEventListener('pointerup', endDrag);
-    viewport.addEventListener('pointercancel', endDrag);
+
+      activePointers.delete(e.pointerId);
+
+      if (activePointers.size === 1) {
+        const rem = activePointers.values().next().value;
+        dragLastX = rem.x;
+        dragLastY = rem.y;
+        isDragging = true;
+      } else if (activePointers.size === 0) {
+        isDragging = false;
+        tapCandidate = null;
+        viewport.classList.remove('dragging');
+        scheduleSharpen(90);
+      }
+    }
+
+    viewport.addEventListener('pointerup', onPointerFinish);
+    viewport.addEventListener('pointercancel', onPointerFinish);
 
     window.addEventListener('resize', () => {
       const newW = viewport.clientWidth;
@@ -1977,7 +2291,11 @@
           showOverviewMode(false);
         } else {
           const data = MILESTONE_DATA[currentMilestone];
-          focusCameraOn(data.camera.x, data.camera.y, isMobileViewport ? 1.55 : data.camera.scale, false);
+          if (isMobileViewport && data.mobileCamera) {
+            focusCameraOn(data.mobileCamera.x, data.mobileCamera.y, getMobileFocusZoom(), false);
+          } else {
+            focusCameraOn(data.camera.x, data.camera.y, data.camera.scale, false);
+          }
         }
       }
     });
